@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import ConfirmModal from '@/components/ConfirmModal';
 import ImageModal from '@/components/ImageModal';
 import EditImageModal from '@/components/EditImageModal';
-import ServiceModal, { ServiceItem } from '@/components/ServiceModal';
+import ServiceModal, { ServiceItem, getServiceDisplayIcon, getCleanServiceDescription } from '@/components/ServiceModal';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination } from 'swiper/modules';
 
@@ -28,15 +28,6 @@ type Appointment = {
     price: number;
     duration_minutes: number;
   };
-};
-
-const getServiceIcon = (name: string) => {
-  const lower = (name || '').toLowerCase();
-  if (lower.includes('barba') || lower.includes('afeitad')) return 'face_6';
-  if (lower.includes('color') || lower.includes('tinte') || lower.includes('mechas') || lower.includes('reflejo')) return 'palette';
-  if (lower.includes('peinado') || lower.includes('brush')) return 'brush';
-  if (lower.includes('spa') || lower.includes('lavado') || lower.includes('tratamiento')) return 'spa';
-  return 'content_cut';
 };
 
 export default function AdminDashboard() {
@@ -669,7 +660,7 @@ export default function AdminDashboard() {
                       <div className="flex items-center justify-between mb-6">
                         <div className="w-12 h-12 bg-[#FAF9F6] border border-[#E2DED5] rounded-2xl flex items-center justify-center shadow-sm">
                           <span className="material-symbols-outlined text-2xl text-[#1A1A1A]">
-                            {getServiceIcon(srv.name)}
+                            {getServiceDisplayIcon(srv)}
                           </span>
                         </div>
 
@@ -701,7 +692,7 @@ export default function AdminDashboard() {
                         {srv.name}
                       </h3>
                       <p className="text-[#6A6A6A] mb-8 leading-relaxed text-sm">
-                        {srv.description || 'Sin descripción'}
+                        {getCleanServiceDescription(srv.description) || 'Sin descripción'}
                       </p>
                     </div>
 

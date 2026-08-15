@@ -10,15 +10,7 @@ import { Navigation, Pagination, Autoplay } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
-
-const getServiceIcon = (name: string) => {
-  const lower = (name || '').toLowerCase();
-  if (lower.includes('barba') || lower.includes('afeitad')) return 'face_6';
-  if (lower.includes('color') || lower.includes('tinte') || lower.includes('mechas') || lower.includes('reflejo')) return 'palette';
-  if (lower.includes('peinado') || lower.includes('brush')) return 'brush';
-  if (lower.includes('spa') || lower.includes('lavado') || lower.includes('tratamiento')) return 'spa';
-  return 'content_cut';
-};
+import { getServiceDisplayIcon, getCleanServiceDescription } from '@/components/ServiceModal';
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -230,11 +222,11 @@ export default function Home() {
                 <div>
                   <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-8 group-hover:scale-105 transition-transform">
                     <span className="material-symbols-outlined text-2xl text-[#1A1A1A]">
-                      {getServiceIcon(srv.name)}
+                      {getServiceDisplayIcon(srv)}
                     </span>
                   </div>
                   <h3 className="font-display text-2xl font-bold mb-3 tracking-tight text-[#1A1A1A]">{srv.name}</h3>
-                  <p className="text-[#6A6A6A] mb-8 leading-relaxed text-sm">{srv.description}</p>
+                  <p className="text-[#6A6A6A] mb-8 leading-relaxed text-sm">{getCleanServiceDescription(srv.description)}</p>
                 </div>
                 <div className="flex justify-between items-center border-t border-[#E2DED5] pt-6 mt-auto">
                   <span className="font-sans text-xl font-semibold text-[#1A1A1A]">${srv.price?.toLocaleString('es-AR')}</span>

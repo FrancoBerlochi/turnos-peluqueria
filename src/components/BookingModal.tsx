@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { getServiceDisplayIcon, getCleanServiceDescription } from './ServiceModal';
 
 type Service = {
   id: string;
   name: string;
+  description?: string;
   price: number;
   duration_minutes: number;
 };
@@ -156,13 +158,20 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
                   <div 
                     key={srv.id}
                     onClick={() => { setSelectedService(srv); handleNext(); }}
-                    className="p-4 rounded-xl border border-[#E2DED5] hover:border-[#1A1A1A] hover:bg-white cursor-pointer transition-all flex justify-between items-center group"
+                    className="p-4 rounded-2xl border border-[#E2DED5] hover:border-[#1A1A1A] hover:bg-white cursor-pointer transition-all flex justify-between items-center group shadow-sm hover:shadow-md"
                   >
-                    <div>
-                      <h4 className="font-bold text-[#1A1A1A]">{srv.name}</h4>
-                      <p className="text-sm text-[#6A6A6A]">{srv.duration_minutes} min</p>
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-[#FAF9F6] border border-[#E2DED5] flex items-center justify-center text-[#1A1A1A] group-hover:bg-[#1A1A1A] group-hover:text-white transition-colors">
+                        <span className="material-symbols-outlined text-xl">
+                          {getServiceDisplayIcon(srv)}
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-[#1A1A1A]">{srv.name}</h4>
+                        <p className="text-xs text-[#8B8878]">{srv.duration_minutes} min</p>
+                      </div>
                     </div>
-                    <span className="font-mono font-semibold">${srv.price}</span>
+                    <span className="font-sans font-bold text-base text-[#1A1A1A]">${srv.price?.toLocaleString('es-AR')}</span>
                   </div>
                 ))
               )}

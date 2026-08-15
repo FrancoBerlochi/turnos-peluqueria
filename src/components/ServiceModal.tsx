@@ -11,6 +11,45 @@ export interface ServiceItem {
   duration_minutes: number;
 }
 
+export const AVAILABLE_SERVICE_ICONS = [
+  { id: 'content_cut', label: 'Tijeras', category: 'Corte' },
+  { id: 'face_6', label: 'Barba', category: 'Barbería' },
+  { id: 'face', label: 'Perfilado', category: 'Rostro' },
+  { id: 'palette', label: 'Coloración', category: 'Color' },
+  { id: 'brush', label: 'Peinado', category: 'Styling' },
+  { id: 'spa', label: 'Spa / Lavado', category: 'Cuidado' },
+  { id: 'auto_awesome', label: 'Freestyle', category: 'Especial' },
+  { id: 'diamond', label: 'VIP / Premium', category: 'Exclusivo' },
+  { id: 'bolt', label: 'Express', category: 'Rápido' },
+  { id: 'local_fire_department', label: 'Tendencia', category: 'Moda' },
+  { id: 'dry_cleaning', label: 'Toalla Caliente', category: 'Ritual' },
+  { id: 'star', label: 'Destacado', category: 'Estrella' },
+];
+
+export const parseServiceDescription = (desc?: string) => {
+  if (!desc) return { icon: null, cleanDescription: '' };
+  const match = desc.match(/^\[icon:([a-z0-9_]+)\]\s*(.*)$/s);
+  if (match) {
+    return { icon: match[1], cleanDescription: match[2] };
+  }
+  return { icon: null, cleanDescription: desc };
+};
+
+export const getServiceDisplayIcon = (srv: { name: string; description?: string }) => {
+  const parsed = parseServiceDescription(srv.description);
+  if (parsed.icon) return parsed.icon;
+  const lower = (srv.name || '').toLowerCase();
+  if (lower.includes('barba') || lower.includes('afeitad')) return 'face_6';
+  if (lower.includes('color') || lower.includes('tinte') || lower.includes('mechas') || lower.includes('reflejo')) return 'palette';
+  if (lower.includes('peinado') || lower.includes('brush')) return 'brush';
+  if (lower.includes('spa') || lower.includes('lavado') || lower.includes('tratamiento')) return 'spa';
+  return 'content_cut';
+};
+
+export const getCleanServiceDescription = (desc?: string) => {
+  return parseServiceDescription(desc).cleanDescription;
+};
+
 interface ServiceModalProps {
   isOpen: boolean;
   serviceToEdit: ServiceItem | null;
@@ -26,6 +65,7 @@ export default function ServiceModal({
 }: ServiceModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedIcon, setSelectedIcon] = useState('content_cut');
   const [price, setPrice] = useState<number | ''>('');
   const [duration, setDuration] = useState<number | ''>(30);
   const [loading, setLoading] = useState(false);
@@ -33,12 +73,15 @@ export default function ServiceModal({
   useEffect(() => {
     if (serviceToEdit) {
       setName(serviceToEdit.name || '');
-      setDescription(serviceToEdit.description || '');
+      const parsed = parseServiceDescription(serviceToEdit.description);
+      setDescription(parsed.cleanDescription);
+      setSelectedIcon(parsed.icon || getServiceDisplayIcon(serviceToEdit));
       setPrice(serviceToEdit.price || '');
       setDuration(serviceToEdit.duration_minutes || 30);
     } else {
       setName('');
       setDescription('');
+      setSelectedIcon('content_cut');
       setPrice('');
       setDuration(30);
     }
@@ -58,6 +101,8 @@ export default function ServiceModal({
     setLoading(true);
     const toastId = toast.loading(serviceToEdit ? 'Guardando cambios...' : 'Creando servicio...');
 
+    const formattedDescription = `[icon:${selectedIcon}] ${description.trim()}`;
+
     try {
       const url = serviceToEdit 
         ? `http://localhost:3001/api/services/${serviceToEdit.id}` 
@@ -70,7 +115,7 @@ export default function ServiceModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
-          description: description.trim(),
+          description: formattedDescription,
           price: Number(price),
           duration_minutes: Number(duration) || 30,
         }),
@@ -104,13 +149,13 @@ export default function ServiceModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-[#FAF9F6] w-full max-w-lg rounded-[2.5rem] p-6 md:p-8 shadow-2xl border border-[#E2DED5] animate-in zoom-in-95 duration-200">
+      <div className="bg-[#FAF9F6] w-full max-w-lg rounded-[2.5rem] p-6 md:p-8 shadow-2xl border border-[#E2DED5] animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
-        <div className="flex justify-between items-center pb-4 border-b border-[#E2DED5] mb-6">
+        <div className="flex justify-between items-center pb-4 border-b border-[#E2DED5] mb-6 sticky top-0 bg-[#FAF9F6] z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#EFECE3] border border-[#E2DED5] flex items-center justify-center text-[#1A1A1A]">
-              <span className="material-symbols-outlined text-xl">content_cut</span>
+            <div className="w-11 h-11 rounded-2xl bg-[#1A1A1A] text-white flex items-center justify-center shadow-sm">
+              <span className="material-symbols-outlined text-2xl">{selectedIcon}</span>
             </div>
             <div>
               <h3 className="font-display text-2xl font-bold text-[#1A1A1A]">
@@ -134,6 +179,44 @@ export default function ServiceModal({
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           
+          {/* Icon Selector Grid */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#5A5A5A]">
+                Seleccionar Ícono del Servicio
+              </label>
+              <span className="text-[11px] text-[#8B8878] font-medium">
+                Seleccionado: <strong className="text-[#1A1A1A]">{AVAILABLE_SERVICE_ICONS.find(i => i.id === selectedIcon)?.label}</strong>
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 p-2 bg-[#EFECE3]/60 rounded-2xl border border-[#E2DED5]">
+              {AVAILABLE_SERVICE_ICONS.map((item) => {
+                const isSelected = selectedIcon === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedIcon(item.id)}
+                    className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-md scale-105'
+                        : 'bg-white text-[#1A1A1A] border-[#E2DED5] hover:border-[#1A1A1A]/40 hover:bg-[#FAF9F6]'
+                    }`}
+                    title={item.label}
+                  >
+                    <span className="material-symbols-outlined text-2xl mb-1">
+                      {item.id}
+                    </span>
+                    <span className="text-[10px] font-semibold text-center leading-tight truncate w-full">
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Name */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-[#5A5A5A] mb-1.5">
@@ -146,7 +229,7 @@ export default function ServiceModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="Ej: Corte Clásico, Degradé (Fade), etc."
               disabled={loading}
-              className="w-full p-3.5 rounded-xl border border-[#E2DED5] bg-white focus:outline-none focus:border-[#1A1A1A] text-sm shadow-sm"
+              className="w-full p-3.5 rounded-xl border border-[#E2DED5] bg-white focus:outline-none focus:border-[#1A1A1A] text-sm shadow-sm font-medium"
             />
           </div>
 
@@ -156,7 +239,7 @@ export default function ServiceModal({
               Descripción
             </label>
             <textarea
-              rows={3}
+              rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ej: Asesoría de imagen, corte preciso a tijera o máquina y styling final."
@@ -235,3 +318,4 @@ export default function ServiceModal({
     </div>
   );
 }
+
