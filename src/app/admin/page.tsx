@@ -31,6 +31,16 @@ type Appointment = {
   };
 };
 
+const DAYS_OF_WEEK = [
+  { id: 1, name: 'Lunes', short: 'Lun' },
+  { id: 2, name: 'Martes', short: 'Mar' },
+  { id: 3, name: 'Miércoles', short: 'Mié' },
+  { id: 4, name: 'Jueves', short: 'Jue' },
+  { id: 5, name: 'Viernes', short: 'Vie' },
+  { id: 6, name: 'Sábado', short: 'Sáb' },
+  { id: 0, name: 'Domingo', short: 'Dom' },
+];
+
 export default function AdminDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [gallery, setGallery] = useState<{id: string, image_url: string, title: string}[]>([]);
@@ -42,8 +52,29 @@ export default function AdminDashboard() {
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [activeTab, setActiveTab] = useState<'appointments' | 'services' | 'gallery'>('appointments');
+  const [activeTab, setActiveTab] = useState<'appointments' | 'services' | 'gallery' | 'schedule'>('appointments');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
+
+  // Schedule Configuration State
+  const [scheduleConfig, setScheduleConfig] = useState<{
+    working_days: number[];
+    slots: string[];
+    slot_interval: number;
+  }>({
+    working_days: [1, 2, 3, 4, 5, 6],
+    slots: ["10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00"],
+    slot_interval: 30
+  });
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [newCustomSlot, setNewCustomSlot] = useState('');
+  
+  // Generator State
+  const [genMorningStart, setGenMorningStart] = useState('10:00');
+  const [genMorningEnd, setGenMorningEnd] = useState('13:00');
+  const [enableAfternoon, setEnableAfternoon] = useState(true);
+  const [genAfternoonStart, setGenAfternoonStart] = useState('17:00');
+  const [genAfternoonEnd, setGenAfternoonEnd] = useState('20:30');
+  const [genInterval, setGenInterval] = useState(30);
 
   // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -100,11 +131,127 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchSchedule = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/schedule`);
+      if (res.ok) {
+        const data = await res.json();
+        setScheduleConfig(data);
+        if (data.slot_interval) setGenInterval(data.slot_interval);
+      }
+    } catch (error) {
+      console.error('Error fetching schedule:', error);
+    }
+  };
+
   useEffect(() => {
     fetchAppointments();
     fetchGallery();
     fetchServices();
+    fetchSchedule();
   }, []);
+
+  const handleSaveSchedule = async () => {
+    setSavingSchedule(true);
+    const toastId = toast.loading('Guardando configuración de horarios...');
+    try {
+      const res = await fetch(`${API_URL}/api/schedule`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scheduleConfig)
+      });
+      if (!res.ok) throw new Error('Error al guardar horarios');
+      const data = await res.json();
+      setScheduleConfig(data);
+      toast.update(toastId, {
+        render: '¡Horarios y turnos guardados con éxito! ⏰',
+        type: 'success',
+        isLoading: false,
+        autoClose: 3000
+      });
+    } catch (e) {
+      console.error(e);
+      toast.update(toastId, {
+        render: 'Hubo un error al guardar los horarios.',
+        type: 'error',
+        isLoading: false,
+        autoClose: 4000
+      });
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  const toggleWorkingDay = (dayIndex: number) => {
+    setScheduleConfig(prev => {
+      const exists = prev.working_days.includes(dayIndex);
+      const nextDays = exists 
+        ? prev.working_days.filter(d => d !== dayIndex) 
+        : [...prev.working_days, dayIndex].sort((a, b) => a - b);
+      return { ...prev, working_days: nextDays };
+    });
+  };
+
+  const removeSlot = (slotStr: string) => {
+    setScheduleConfig(prev => ({
+      ...prev,
+      slots: prev.slots.filter(s => s !== slotStr)
+    }));
+  };
+
+  const addCustomSlot = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newCustomSlot) return;
+    const formatted = newCustomSlot.trim();
+    if (scheduleConfig.slots.includes(formatted)) {
+      toast.warning('Este horario ya se encuentra en la lista.');
+      return;
+    }
+    const updated = [...scheduleConfig.slots, formatted].sort((a, b) => {
+      const [ha, ma] = a.split(':').map(Number);
+      const [hb, mb] = b.split(':').map(Number);
+      return (ha * 60 + ma) - (hb * 60 + mb);
+    });
+    setScheduleConfig(prev => ({ ...prev, slots: updated }));
+    setNewCustomSlot('');
+    toast.success(`Horario ${formatted} agregado.`);
+  };
+
+  const generateSlotsFromRanges = () => {
+    const slots: string[] = [];
+    const interval = Number(genInterval) || 30;
+
+    const generateRange = (start: string, end: string) => {
+      const [startH, startM] = start.split(':').map(Number);
+      const [endH, endM] = end.split(':').map(Number);
+      let currentMinutes = startH * 60 + startM;
+      const endMinutes = endH * 60 + endM;
+
+      while (currentMinutes <= endMinutes) {
+        const h = Math.floor(currentMinutes / 60);
+        const m = currentMinutes % 60;
+        const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        if (!slots.includes(timeStr)) slots.push(timeStr);
+        currentMinutes += interval;
+      }
+    };
+
+    if (genMorningStart && genMorningEnd) {
+      generateRange(genMorningStart, genMorningEnd);
+    }
+    if (enableAfternoon && genAfternoonStart && genAfternoonEnd) {
+      generateRange(genAfternoonStart, genAfternoonEnd);
+    }
+
+    slots.sort((a, b) => {
+      const [ha, ma] = a.split(':').map(Number);
+      const [hb, mb] = b.split(':').map(Number);
+      return (ha * 60 + ma) - (hb * 60 + mb);
+    });
+
+    setScheduleConfig(prev => ({ ...prev, slots, slot_interval: interval }));
+    toast.success(`¡Se generaron ${slots.length} horarios automáticos!`);
+  };
 
   const openApproveModal = (app: Appointment) => {
     setConfirmModal({
@@ -378,7 +525,7 @@ export default function AdminDashboard() {
                 <span className="w-full h-0.5 bg-white rounded-full"></span>
               </span>
               <span className="font-semibold text-xs capitalize">
-                {activeTab === 'appointments' ? 'Turnos' : activeTab === 'services' ? 'Servicios' : 'Galería'}
+                {activeTab === 'appointments' ? 'Turnos' : activeTab === 'services' ? 'Servicios' : activeTab === 'gallery' ? 'Galería' : 'Horarios'}
               </span>
             </button>
           ) : (
@@ -472,6 +619,28 @@ export default function AdminDashboard() {
                 </div>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeTab === 'services' ? 'bg-white text-black' : 'bg-[#EFECE3] text-[#5A5A5A]'}`}>
                   {services.length}
+                </span>
+              </button>
+
+              <button 
+                onClick={() => {
+                  setActiveTab('schedule');
+                  setIsNavOpen(false);
+                }}
+                className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all text-left w-full ${
+                  activeTab === 'schedule' 
+                    ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-sm' 
+                    : 'bg-white border-[#E2DED5] text-[#1A1A1A] hover:bg-[#EFECE3]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${activeTab === 'schedule' ? 'bg-white/20 text-white' : 'bg-[#EFECE3] text-[#1A1A1A]'}`}>
+                    <span className="material-symbols-outlined text-lg">schedule</span>
+                  </div>
+                  <span className="font-semibold text-base">Horarios de Atención</span>
+                </div>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeTab === 'schedule' ? 'bg-white text-black' : 'bg-[#EFECE3] text-[#5A5A5A]'}`}>
+                  {scheduleConfig.slots.length}
                 </span>
               </button>
 
@@ -827,6 +996,288 @@ export default function AdminDashboard() {
                     </Swiper>
                   </div>
                 )}
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* SCHEDULE CONFIGURATION TAB */}
+        {activeTab === 'schedule' && (
+          <div>
+            {/* Top Bar: Title & Save Button */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 bg-white p-6 md:p-8 rounded-[2rem] border border-[#E2DED5] shadow-sm">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="material-symbols-outlined text-2xl text-[#1A1A1A]">schedule</span>
+                  <h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight text-[#1A1A1A]">
+                    Configuración de Horarios y Turnos
+                  </h1>
+                </div>
+                <p className="text-[#6A6A6A] text-sm">
+                  Define los días laborales y personaliza las franjas horarias disponibles para que tus clientes reserven.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveSchedule}
+                disabled={savingSchedule}
+                className="bg-[#1A1A1A] hover:bg-black active:scale-95 text-white px-6 py-3.5 rounded-full font-bold text-sm shadow-md transition-all flex items-center gap-2 disabled:opacity-50 shrink-0 cursor-pointer"
+              >
+                {savingSchedule ? (
+                  <>
+                    <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    <span>Guardando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-lg">save</span>
+                    <span>Guardar Cambios</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              
+              {/* Left Column: Días de Atención & Generador Inteligente */}
+              <div className="lg:col-span-5 flex flex-col gap-8">
+                
+                {/* DÍAS LABORALES */}
+                <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-[#E2DED5] shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-display text-xl font-bold text-[#1A1A1A] flex items-center gap-2">
+                      <span className="material-symbols-outlined text-xl">calendar_today</span>
+                      <span>Días de Atención</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#FAF9F6] text-[#5A5A5A] border border-[#E2DED5]">
+                      {scheduleConfig.working_days.length} días activos
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#8B8878] mb-5">
+                    Haz clic en cada día para habilitar o deshabilitar la atención al público.
+                  </p>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {DAYS_OF_WEEK.map((day) => {
+                      const isActive = scheduleConfig.working_days.includes(day.id);
+                      return (
+                        <button
+                          key={day.id}
+                          type="button"
+                          onClick={() => toggleWorkingDay(day.id)}
+                          className={`p-3.5 rounded-2xl border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                            isActive
+                              ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-sm'
+                              : 'bg-[#FAF9F6] text-[#8B8878] border-[#E2DED5] hover:border-[#1A1A1A]/30 opacity-70'
+                          }`}
+                        >
+                          <span className="font-display font-bold text-sm">{day.name}</span>
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider ${isActive ? 'text-green-400' : 'text-zinc-400'}`}>
+                            {isActive ? 'Abierto' : 'Cerrado'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* GENERADOR RÁPIDO DE RANGOS */}
+                <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-[#E2DED5] shadow-sm">
+                  <h3 className="font-display text-xl font-bold text-[#1A1A1A] mb-1 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-xl">auto_fix_high</span>
+                    <span>Generador Automático</span>
+                  </h3>
+                  <p className="text-xs text-[#8B8878] mb-6">
+                    Establece los turnos de mañana/tarde y el intervalo para generar todos los horarios en un solo clic.
+                  </p>
+
+                  <div className="flex flex-col gap-4">
+                    {/* Turno Mañana */}
+                    <div className="p-4 rounded-2xl bg-[#FAF9F6] border border-[#E2DED5]">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A] block mb-2">
+                        Turno Mañana
+                      </span>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-[#6A6A6A] mb-1">Desde</label>
+                          <input
+                            type="time"
+                            value={genMorningStart}
+                            onChange={(e) => setGenMorningStart(e.target.value)}
+                            className="w-full p-2.5 rounded-xl border border-[#E2DED5] bg-white text-xs font-semibold focus:outline-none focus:border-[#1A1A1A]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-[#6A6A6A] mb-1">Hasta</label>
+                          <input
+                            type="time"
+                            value={genMorningEnd}
+                            onChange={(e) => setGenMorningEnd(e.target.value)}
+                            className="w-full p-2.5 rounded-xl border border-[#E2DED5] bg-white text-xs font-semibold focus:outline-none focus:border-[#1A1A1A]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Turno Tarde */}
+                    <div className="p-4 rounded-2xl bg-[#FAF9F6] border border-[#E2DED5]">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
+                          Turno Tarde
+                        </span>
+                        <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-[#6A6A6A]">
+                          <input
+                            type="checkbox"
+                            checked={enableAfternoon}
+                            onChange={(e) => setEnableAfternoon(e.target.checked)}
+                            className="rounded"
+                          />
+                          <span>Habilitar</span>
+                        </label>
+                      </div>
+                      
+                      {enableAfternoon && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-medium text-[#6A6A6A] mb-1">Desde</label>
+                            <input
+                              type="time"
+                              value={genAfternoonStart}
+                              onChange={(e) => setGenAfternoonStart(e.target.value)}
+                              className="w-full p-2.5 rounded-xl border border-[#E2DED5] bg-white text-xs font-semibold focus:outline-none focus:border-[#1A1A1A]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-[#6A6A6A] mb-1">Hasta</label>
+                            <input
+                              type="time"
+                              value={genAfternoonEnd}
+                              onChange={(e) => setGenAfternoonEnd(e.target.value)}
+                              className="w-full p-2.5 rounded-xl border border-[#E2DED5] bg-white text-xs font-semibold focus:outline-none focus:border-[#1A1A1A]"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Intervalo */}
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-[#5A5A5A] mb-1.5">
+                        Frecuencia entre Turnos
+                      </label>
+                      <select
+                        value={genInterval}
+                        onChange={(e) => setGenInterval(Number(e.target.value))}
+                        className="w-full p-3 rounded-xl border border-[#E2DED5] bg-white text-xs font-semibold focus:outline-none focus:border-[#1A1A1A]"
+                      >
+                        <option value={15}>Cada 15 minutos</option>
+                        <option value={20}>Cada 20 minutos</option>
+                        <option value={30}>Cada 30 minutos (Recomendado)</option>
+                        <option value={40}>Cada 40 minutos</option>
+                        <option value={45}>Cada 45 minutos</option>
+                        <option value={60}>Cada 60 minutos (1 hora)</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={generateSlotsFromRanges}
+                      className="w-full py-3.5 rounded-xl bg-[#EFECE3] hover:bg-[#E2DED5] text-[#1A1A1A] font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                    >
+                      <span className="material-symbols-outlined text-base">bolt</span>
+                      <span>Generar y Reemplazar Horarios</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Right Column: Parrilla de Horarios Activos y Agregar Manual */}
+              <div className="lg:col-span-7 flex flex-col gap-8">
+                
+                <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-[#E2DED5] shadow-sm">
+                  
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-[#E2DED5] mb-6">
+                    <div>
+                      <h3 className="font-display text-xl font-bold text-[#1A1A1A] flex items-center gap-2">
+                        <span className="material-symbols-outlined text-xl">alarm_on</span>
+                        <span>Horarios Disponibles para Reservas</span>
+                      </h3>
+                      <p className="text-xs text-[#8B8878] mt-0.5">
+                        Estos son los turnos exactos que tus clientes podrán seleccionar.
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-[#1A1A1A] text-white shrink-0">
+                      {scheduleConfig.slots.length} turnos configurados
+                    </span>
+                  </div>
+
+                  {/* Formulario para agregar horario manual individual */}
+                  <form onSubmit={addCustomSlot} className="flex gap-2.5 mb-6 p-4 rounded-2xl bg-[#FAF9F6] border border-[#E2DED5]">
+                    <div className="flex-1">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#5A5A5A] mb-1">
+                        Agregar Horario Individual
+                      </label>
+                      <input
+                        type="time"
+                        value={newCustomSlot}
+                        onChange={(e) => setNewCustomSlot(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-[#E2DED5] bg-white text-xs font-bold focus:outline-none focus:border-[#1A1A1A]"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!newCustomSlot}
+                      className="self-end px-5 py-2.5 rounded-xl bg-[#1A1A1A] hover:bg-black text-white text-xs font-bold transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-sm">add</span>
+                      <span>Agregar</span>
+                    </button>
+                  </form>
+
+                  {/* Grid de Chips de Horarios */}
+                  {scheduleConfig.slots.length === 0 ? (
+                    <div className="text-center py-12 px-4 rounded-2xl bg-[#FAF9F6] border border-dashed border-[#E2DED5]">
+                      <span className="material-symbols-outlined text-4xl text-[#8B8878] mb-2">more_time</span>
+                      <p className="text-sm font-semibold text-[#1A1A1A]">No tienes horarios configurados</p>
+                      <p className="text-xs text-[#8B8878] mt-1">Usa el generador a la izquierda o agrega horarios individuales.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {scheduleConfig.slots.map((slot) => (
+                        <div
+                          key={slot}
+                          className="group relative p-3 rounded-2xl border border-[#E2DED5] bg-[#FAF9F6] hover:bg-white hover:border-[#1A1A1A] transition-all flex items-center justify-between shadow-sm"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sm text-[#8B8878]">schedule</span>
+                            <span className="font-mono font-bold text-sm text-[#1A1A1A]">{slot}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeSlot(slot)}
+                            className="w-6 h-6 rounded-full bg-red-100 hover:bg-red-600 hover:text-white text-red-700 flex items-center justify-center transition-colors cursor-pointer"
+                            title={`Eliminar turno ${slot}`}
+                          >
+                            <span className="material-symbols-outlined text-xs">close</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Info helper */}
+                  <div className="mt-8 p-4 rounded-2xl bg-[#EFECE3]/50 border border-[#E2DED5] flex items-start gap-3">
+                    <span className="material-symbols-outlined text-lg text-[#1A1A1A] shrink-0 mt-0.5">info</span>
+                    <p className="text-xs text-[#5A5A5A] leading-relaxed">
+                      💡 <strong>Recuerda guardar los cambios:</strong> Cuando termines de ajustar los días y horarios, presiona el botón <strong>«Guardar Cambios»</strong> arriba para que se apliquen en tiempo real en la página de reservas.
+                    </p>
+                  </div>
+
+                </div>
+
               </div>
 
             </div>

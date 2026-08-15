@@ -13,9 +13,16 @@ type Service = {
   duration_minutes: number;
 };
 
+type ScheduleConfig = {
+  working_days: number[];
+  slots: string[];
+  slot_interval?: number;
+};
+
 export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [step, setStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
+  const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Form State
@@ -37,8 +44,28 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
     }
   }, [appointmentDate]);
 
+  const getDayOfWeek = (dateStr: string) => {
+    if (!dateStr) return null;
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      return d.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+    }
+    return new Date(`${dateStr}T12:00:00`).getDay();
+  };
+
+  const isDayClosed = () => {
+    if (!appointmentDate || !scheduleConfig) return false;
+    const day = getDayOfWeek(appointmentDate);
+    if (day === null) return false;
+    return !scheduleConfig.working_days.includes(day);
+  };
+
   const generateAvailableHours = () => {
-    const hours = ['10:00:00', '11:00:00', '12:00:00', '14:00:00', '15:00:00', '16:00:00', '17:00:00', '18:00:00'];
+    const rawSlots = scheduleConfig?.slots && scheduleConfig.slots.length > 0
+      ? scheduleConfig.slots
+      : ['10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
+
     const now = new Date();
     // Ajustar para timezone local
     const tzoffset = now.getTimezoneOffset() * 60000; 
@@ -47,33 +74,52 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
     
     const isToday = appointmentDate === todayStr;
     const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
 
-    return hours.map(timeStr => {
-      const hourNum = parseInt(timeStr.split(':')[0]);
-      const isBooked = bookedTimes.includes(timeStr);
-      const isPast = isToday && hourNum <= currentHour;
+    return rawSlots.map(slot => {
+      // Normalizar slot a HH:mm:ss para la base de datos
+      const parts = slot.split(':');
+      const hourNum = parseInt(parts[0]);
+      const minuteNum = parseInt(parts[1] || '0');
+      const timeStr = `${parts[0].padStart(2, '0')}:${(parts[1] || '00').padStart(2, '0')}:00`;
+
+      const isBooked = bookedTimes.some(bt => bt.startsWith(`${parts[0].padStart(2, '0')}:${(parts[1] || '00').padStart(2, '0')}`));
+      const isPast = isToday && (hourNum < currentHour || (hourNum === currentHour && minuteNum <= currentMinute));
+      
+      const displayLabel = new Date(`2000-01-01T${timeStr}`).toLocaleTimeString('es-AR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+
       return {
         timeStr,
-        label: new Date(`2000-01-01T${timeStr}`).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'}),
+        label: displayLabel,
         disabled: isBooked || isPast
       };
     });
   };
 
   useEffect(() => {
-    if (isOpen && services.length === 0) {
-      // Fetch services from backend
-      setLoading(true);
-      fetch(`${API_URL}/api/services`)
+    if (isOpen) {
+      if (services.length === 0) {
+        setLoading(true);
+        fetch(`${API_URL}/api/services`)
+          .then(res => res.json())
+          .then(data => {
+            setServices(data);
+            setLoading(false);
+          })
+          .catch(err => {
+            console.error(err);
+            setLoading(false);
+          });
+      }
+
+      fetch(`${API_URL}/api/schedule`)
         .then(res => res.json())
-        .then(data => {
-          setServices(data);
-          setLoading(false);
-        })
-        .catch(err => {
-          console.error(err);
-          setLoading(false);
-        });
+        .then(data => setScheduleConfig(data))
+        .catch(err => console.error('Error fetching schedule:', err));
     }
   }, [isOpen]);
 
@@ -187,13 +233,26 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
                 <input 
                   type="date" 
                   value={appointmentDate}
-                  onChange={(e) => setAppointmentDate(e.target.value)}
+                  onChange={(e) => {
+                    setAppointmentDate(e.target.value);
+                    setAppointmentTime('');
+                  }}
                   className="w-full p-3 rounded-xl border border-[#E2DED5] focus:outline-none focus:border-[#1A1A1A] bg-white"
                   min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
                 />
               </div>
               
-              {appointmentDate && (
+              {appointmentDate && isDayClosed() && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-sm flex items-center gap-3">
+                  <span className="material-symbols-outlined text-xl text-amber-700">event_busy</span>
+                  <div>
+                    <p className="font-bold">El local no atiende este día</p>
+                    <p className="text-xs text-amber-800">Por favor selecciona otro día de la semana para tu turno.</p>
+                  </div>
+                </div>
+              )}
+
+              {appointmentDate && !isDayClosed() && (
                 <div>
                   <label className="block text-sm font-medium text-[#5A5A5A] mb-2">Hora</label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -206,7 +265,7 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
                           ${slot.disabled 
                             ? 'border-[#E2DED5] bg-[#EFECE3] text-[#A8A596] cursor-not-allowed opacity-60' 
                             : appointmentTime === slot.timeStr 
-                              ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white' 
+                              ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white shadow-md' 
                               : 'border-[#E2DED5] bg-white text-[#1A1A1A] hover:border-[#8B8878]'}
                         `}
                       >
