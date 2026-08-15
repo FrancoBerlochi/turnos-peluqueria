@@ -94,8 +94,8 @@ export default function ServiceModal({
       toast.error('El nombre del servicio es obligatorio.');
       return;
     }
-    if (!price || Number(price) <= 0) {
-      toast.error('Ingresa un precio válido.');
+    if (price === '' || isNaN(Number(price)) || Number(price) < 0) {
+      toast.error('Ingresa un precio válido (0 o mayor).');
       return;
     }
 
@@ -259,7 +259,7 @@ export default function ServiceModal({
                 required
                 type="number"
                 min="0"
-                step="500"
+                step="any"
                 value={price}
                 onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="Ej: 10000"
@@ -275,9 +275,9 @@ export default function ServiceModal({
               <input
                 required
                 type="number"
-                min="10"
-                max="240"
-                step="5"
+                min="1"
+                max="480"
+                step="any"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="Ej: 30"
