@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { API_URL } from '@/lib/api';
 
 interface EditImageModalProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export default function EditImageModal({
     }
 
     try {
-      const res = await fetch(`http://localhost:3001/api/gallery/${item.id}`, {
+      const res = await fetch(`${API_URL}/api/gallery/${item.id}`, {
         method: 'PUT',
         body: formData,
       });

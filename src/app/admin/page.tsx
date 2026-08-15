@@ -6,6 +6,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import ImageModal from '@/components/ImageModal';
 import EditImageModal from '@/components/EditImageModal';
 import ServiceModal, { ServiceItem, getServiceDisplayIcon, getCleanServiceDescription } from '@/components/ServiceModal';
+import { API_URL } from '@/lib/api';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination } from 'swiper/modules';
 
@@ -65,7 +66,7 @@ export default function AdminDashboard() {
   const fetchAppointments = async (showToast = false) => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/appointments');
+      const res = await fetch(`${API_URL}/api/appointments`);
       const data = await res.json();
       setAppointments(data);
       if (showToast) toast.info('Turnos actualizados.');
@@ -79,7 +80,7 @@ export default function AdminDashboard() {
 
   const fetchGallery = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/gallery');
+      const res = await fetch(`${API_URL}/api/gallery`);
       const data = await res.json();
       setGallery(data);
     } catch (error) {
@@ -89,7 +90,7 @@ export default function AdminDashboard() {
 
   const fetchServices = async (showToast = false) => {
     try {
-      const res = await fetch('http://localhost:3001/api/services');
+      const res = await fetch(`${API_URL}/api/services`);
       const data = await res.json();
       setServices(data);
       if (showToast) toast.info('Servicios actualizados.');
@@ -115,7 +116,7 @@ export default function AdminDashboard() {
       onConfirm: async () => {
         setIsConfirmLoading(true);
         try {
-          const res = await fetch(`http://localhost:3001/api/appointments/${app.id}/approve`, { method: 'PUT' });
+          const res = await fetch(`${API_URL}/api/appointments/${app.id}/approve`, { method: 'PUT' });
           if (!res.ok) throw new Error('Failed to approve');
           toast.success(`¡Turno de ${app.client_name} aprobado con éxito! 🎉`);
           await fetchAppointments();
@@ -140,7 +141,7 @@ export default function AdminDashboard() {
       onConfirm: async () => {
         setIsConfirmLoading(true);
         try {
-          const res = await fetch(`http://localhost:3001/api/appointments/${app.id}/cancel`, { method: 'PUT' });
+          const res = await fetch(`${API_URL}/api/appointments/${app.id}/cancel`, { method: 'PUT' });
           if (!res.ok) throw new Error('Failed to cancel');
           toast.success(`Turno de ${app.client_name} cancelado.`);
           await fetchAppointments();
@@ -165,7 +166,7 @@ export default function AdminDashboard() {
       onConfirm: async () => {
         setIsConfirmLoading(true);
         try {
-          const res = await fetch(`http://localhost:3001/api/gallery/${item.id}`, { method: 'DELETE' });
+          const res = await fetch(`${API_URL}/api/gallery/${item.id}`, { method: 'DELETE' });
           if (!res.ok) throw new Error('Failed to delete');
           toast.success('Foto eliminada correctamente.');
           await fetchGallery();
@@ -190,7 +191,7 @@ export default function AdminDashboard() {
       onConfirm: async () => {
         setIsConfirmLoading(true);
         try {
-          const res = await fetch(`http://localhost:3001/api/services/${service.id}`, { method: 'DELETE' });
+          const res = await fetch(`${API_URL}/api/services/${service.id}`, { method: 'DELETE' });
           if (!res.ok) throw new Error('Failed to delete');
           toast.success('¡Servicio eliminado con éxito!');
           await fetchServices();
@@ -225,7 +226,7 @@ export default function AdminDashboard() {
     const toastId = toast.loading('Subiendo imagen a Cloudinary...');
 
     try {
-      const res = await fetch('http://localhost:3001/api/gallery', {
+      const res = await fetch(`${API_URL}/api/gallery`, {
         method: 'POST',
         body: formData,
       });

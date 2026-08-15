@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { getServiceDisplayIcon, getCleanServiceDescription } from './ServiceModal';
+import { API_URL } from '@/lib/api';
 
 type Service = {
   id: string;
@@ -26,7 +27,7 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
 
   useEffect(() => {
     if (appointmentDate) {
-      fetch(`http://localhost:3001/api/appointments/booked-times?date=${appointmentDate}`)
+      fetch(`${API_URL}/api/appointments/booked-times?date=${appointmentDate}`)
         .then(res => res.json())
         .then(data => setBookedTimes(data))
         .catch(err => console.error(err));
@@ -63,7 +64,7 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
     if (isOpen && services.length === 0) {
       // Fetch services from backend
       setLoading(true);
-      fetch('http://localhost:3001/api/services')
+      fetch(`${API_URL}/api/services`)
         .then(res => res.json())
         .then(data => {
           setServices(data);
@@ -97,7 +98,7 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
     };
 
     try {
-      const res = await fetch('http://localhost:3001/api/appointments', {
+      const res = await fetch(`${API_URL}/api/appointments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

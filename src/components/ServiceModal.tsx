@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { API_URL } from '@/lib/api';
 
 export interface ServiceItem {
   id?: string;
@@ -105,8 +106,8 @@ export default function ServiceModal({
 
     try {
       const url = serviceToEdit 
-        ? `http://localhost:3001/api/services/${serviceToEdit.id}` 
-        : 'http://localhost:3001/api/services';
+        ? `${API_URL}/api/services/${serviceToEdit.id}` 
+        : `${API_URL}/api/services`;
       
       const method = serviceToEdit ? 'PUT' : 'POST';
 

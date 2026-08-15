@@ -11,6 +11,7 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import { getServiceDisplayIcon, getCleanServiceDescription } from '@/components/ServiceModal';
+import { API_URL } from '@/lib/api';
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,12 +33,12 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/gallery')
+    fetch(`${API_URL}/api/gallery`)
       .then(res => res.json())
       .then(data => setGallery(data))
       .catch(err => console.error(err));
 
-    fetch('http://localhost:3001/api/services')
+    fetch(`${API_URL}/api/services`)
       .then(res => res.json())
       .then(data => setServices(data))
       .catch(err => console.error(err));
