@@ -29,7 +29,7 @@ export const AVAILABLE_SERVICE_ICONS = [
 
 export const parseServiceDescription = (desc?: string) => {
   if (!desc) return { icon: null, cleanDescription: '' };
-  const match = desc.match(/^\[icon:([a-z0-9_]+)\]\s*(.*)$/s);
+  const match = desc.match(/^\[icon:([a-z0-9_]+)\]\s*([\s\S]*)$/);
   if (match) {
     return { icon: match[1], cleanDescription: match[2] };
   }
