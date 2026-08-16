@@ -45,7 +45,6 @@ export default function AdminDashboard() {
   // Auth State
   const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -203,16 +202,15 @@ export default function AdminDashboard() {
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authEmail.trim() || !authPassword.trim()) {
-      toast.error('Por favor completa todos los campos.');
+      toast.error('Por favor ingresa tu correo y contraseña.');
       return;
     }
 
     setAuthLoading(true);
-    const endpoint = authMode === 'login' ? `${API_URL}/api/auth/login` : `${API_URL}/api/auth/register`;
-    const toastId = toast.loading(authMode === 'login' ? 'Iniciando sesión...' : 'Registrando cuenta de administrador...');
+    const toastId = toast.loading('Iniciando sesión...');
 
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: authEmail.trim(), password: authPassword })
@@ -221,7 +219,7 @@ export default function AdminDashboard() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Error en la autenticación.');
+        throw new Error(data.error || 'Credenciales incorrectas.');
       }
 
       if (data.session?.access_token) {
@@ -238,13 +236,7 @@ export default function AdminDashboard() {
         });
         loadDashboardData();
       } else {
-        toast.update(toastId, {
-          render: data.message || 'Cuenta creada. Ahora puedes iniciar sesión.',
-          type: 'success',
-          isLoading: false,
-          autoClose: 4000
-        });
-        setAuthMode('login');
+        throw new Error('No se pudo iniciar la sesión.');
       }
     } catch (error: any) {
       toast.update(toastId, {
@@ -645,34 +637,8 @@ export default function AdminDashboard() {
               PELU<span className="text-[#8B8878] font-light">TURNOS</span>
             </h1>
             <p className="text-xs text-zinc-400 font-medium">
-              Panel de Control y Administración
+              Ingresa con tus credenciales de administrador
             </p>
-          </div>
-
-          {/* Mode Switcher Tabs */}
-          <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 mb-6">
-            <button
-              type="button"
-              onClick={() => setAuthMode('login')}
-              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                authMode === 'login'
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              Iniciar Sesión
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuthMode('register')}
-              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                authMode === 'register'
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              Registrar Admin
-            </button>
           </div>
 
           {/* Form */}
@@ -726,19 +692,17 @@ export default function AdminDashboard() {
             <button
               type="submit"
               disabled={authLoading}
-              className="mt-2 w-full py-3.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-bold text-sm transition-all shadow-md active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              className="mt-3 w-full py-3.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-bold text-sm transition-all shadow-md active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {authLoading ? (
                 <>
                   <span className="inline-block w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
-                  <span>{authMode === 'login' ? 'Iniciando sesión...' : 'Registrando...'}</span>
+                  <span>Iniciando sesión...</span>
                 </>
               ) : (
                 <>
-                  <span className="material-symbols-outlined text-lg">
-                    {authMode === 'login' ? 'login' : 'person_add'}
-                  </span>
-                  <span>{authMode === 'login' ? 'Acceder al Panel' : 'Crear Cuenta'}</span>
+                  <span className="material-symbols-outlined text-lg">login</span>
+                  <span>Acceder al Panel</span>
                 </>
               )}
             </button>
