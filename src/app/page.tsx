@@ -213,29 +213,37 @@ export default function Home() {
             <p className="text-[#8B8878] max-w-xl mx-auto text-lg">Descubre nuestros servicios más solicitados, pensados para ti.</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {services.map(srv => (
-              <div 
-                key={srv.id}
-                onClick={() => setIsModalOpen(true)} 
-                className="bg-[#FAF9F6] p-10 rounded-[2rem] hover:-translate-y-2 transition-transform duration-500 cursor-pointer shadow-sm border border-transparent hover:border-[#E2DED5] flex flex-col justify-between group"
-              >
-                <div>
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-8 group-hover:scale-105 transition-transform">
-                    <span className="material-symbols-outlined text-2xl text-[#1A1A1A]">
-                      {getServiceDisplayIcon(srv)}
-                    </span>
+          {services.length === 0 ? (
+            <div className="text-center py-12 px-6 bg-[#FAF9F6] rounded-[2rem] border border-[#E2DED5] max-w-lg mx-auto">
+              <span className="material-symbols-outlined text-4xl text-[#8B8878] mb-3">content_cut</span>
+              <p className="text-[#1A1A1A] font-semibold text-lg mb-1">Próximamente nuevos servicios</p>
+              <p className="text-[#8B8878] text-sm">El barbero está preparando la lista de cortes y servicios disponibles.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {services.map(srv => (
+                <div 
+                  key={srv.id}
+                  onClick={() => setIsModalOpen(true)} 
+                  className="bg-[#FAF9F6] p-10 rounded-[2rem] hover:-translate-y-2 transition-transform duration-500 cursor-pointer shadow-sm border border-transparent hover:border-[#E2DED5] flex flex-col justify-between group"
+                >
+                  <div>
+                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-8 group-hover:scale-105 transition-transform">
+                      <span className="material-symbols-outlined text-2xl text-[#1A1A1A]">
+                        {getServiceDisplayIcon(srv)}
+                      </span>
+                    </div>
+                    <h3 className="font-display text-2xl font-bold mb-3 tracking-tight text-[#1A1A1A]">{srv.name}</h3>
+                    <p className="text-[#6A6A6A] mb-8 leading-relaxed text-sm">{getCleanServiceDescription(srv.description)}</p>
                   </div>
-                  <h3 className="font-display text-2xl font-bold mb-3 tracking-tight text-[#1A1A1A]">{srv.name}</h3>
-                  <p className="text-[#6A6A6A] mb-8 leading-relaxed text-sm">{getCleanServiceDescription(srv.description)}</p>
+                  <div className="flex justify-between items-center border-t border-[#E2DED5] pt-6 mt-auto">
+                    <span className="font-sans text-xl font-semibold text-[#1A1A1A]">${srv.price?.toLocaleString('es-AR')}</span>
+                    <span className="text-xs font-bold text-[#8B8878] tracking-wider uppercase bg-white px-3 py-1.5 rounded-full shadow-sm">{srv.duration_minutes} min</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center border-t border-[#E2DED5] pt-6 mt-auto">
-                  <span className="font-sans text-xl font-semibold text-[#1A1A1A]">${srv.price?.toLocaleString('es-AR')}</span>
-                  <span className="text-xs font-bold text-[#8B8878] tracking-wider uppercase bg-white px-3 py-1.5 rounded-full shadow-sm">{srv.duration_minutes} min</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
