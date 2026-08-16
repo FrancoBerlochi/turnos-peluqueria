@@ -42,6 +42,15 @@ const DAYS_OF_WEEK = [
 ];
 
 export default function AdminDashboard() {
+  // Auth State
+  const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [gallery, setGallery] = useState<{id: string, image_url: string, title: string}[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -94,6 +103,13 @@ export default function AdminDashboard() {
   });
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
 
+  const loadDashboardData = () => {
+    fetchAppointments();
+    fetchGallery();
+    fetchServices();
+    fetchSchedule();
+  };
+
   const fetchAppointments = async (showToast = false) => {
     setLoading(true);
     try {
@@ -144,12 +160,111 @@ export default function AdminDashboard() {
     }
   };
 
+  // Auth Verification on mount
   useEffect(() => {
-    fetchAppointments();
-    fetchGallery();
-    fetchServices();
-    fetchSchedule();
+    const token = typeof window !== 'undefined' ? localStorage.getItem('peluturnos_admin_token') : null;
+    if (!token) {
+      setIsCheckingAuth(false);
+      return;
+    }
+
+    fetch(`${API_URL}/api/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated && data.user) {
+          setCurrentUser(data.user);
+          loadDashboardData();
+        } else {
+          localStorage.removeItem('peluturnos_admin_token');
+          localStorage.removeItem('peluturnos_admin_user');
+          setCurrentUser(null);
+        }
+      })
+      .catch(() => {
+        const cachedUser = localStorage.getItem('peluturnos_admin_user');
+        if (cachedUser) {
+          try {
+            setCurrentUser(JSON.parse(cachedUser));
+            loadDashboardData();
+          } catch {
+            setCurrentUser(null);
+          }
+        } else {
+          setCurrentUser(null);
+        }
+      })
+      .finally(() => {
+        setIsCheckingAuth(false);
+      });
   }, []);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail.trim() || !authPassword.trim()) {
+      toast.error('Por favor completa todos los campos.');
+      return;
+    }
+
+    setAuthLoading(true);
+    const endpoint = authMode === 'login' ? `${API_URL}/api/auth/login` : `${API_URL}/api/auth/register`;
+    const toastId = toast.loading(authMode === 'login' ? 'Iniciando sesión...' : 'Registrando cuenta de administrador...');
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: authEmail.trim(), password: authPassword })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Error en la autenticación.');
+      }
+
+      if (data.session?.access_token) {
+        localStorage.setItem('peluturnos_admin_token', data.session.access_token);
+        if (data.user) {
+          localStorage.setItem('peluturnos_admin_user', JSON.stringify(data.user));
+          setCurrentUser(data.user);
+        }
+        toast.update(toastId, {
+          render: `¡Bienvenido, ${data.user?.email || 'Administrador'}! 💈`,
+          type: 'success',
+          isLoading: false,
+          autoClose: 3000
+        });
+        loadDashboardData();
+      } else {
+        toast.update(toastId, {
+          render: data.message || 'Cuenta creada. Ahora puedes iniciar sesión.',
+          type: 'success',
+          isLoading: false,
+          autoClose: 4000
+        });
+        setAuthMode('login');
+      }
+    } catch (error: any) {
+      toast.update(toastId, {
+        render: error.message || 'Hubo un error al iniciar sesión.',
+        type: 'error',
+        isLoading: false,
+        autoClose: 4000
+      });
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('peluturnos_admin_token');
+    localStorage.removeItem('peluturnos_admin_user');
+    setCurrentUser(null);
+    setIsNavOpen(false);
+    toast.info('Sesión cerrada correctamente. ¡Hasta pronto! 👋');
+  };
 
   const handleSaveSchedule = async () => {
     setSavingSchedule(true);
@@ -500,6 +615,151 @@ export default function AdminDashboard() {
     </div>
   );
 
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-12 h-20 rounded-full border-[3px] border-[#A8A59E] p-0.5 bg-[#121212] flex items-center justify-center overflow-hidden relative shadow-2xl mb-6">
+          <div className="w-full h-full rounded-full barber-pole relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-white/40 via-transparent to-black/35 pointer-events-none rounded-full"></div>
+          </div>
+        </div>
+        <h2 className="font-display text-xl font-bold text-[#1A1A1A] tracking-tight mb-1">
+          PELU<span className="text-[#8B8878] font-light">TURNOS</span>
+        </h2>
+        <p className="text-xs text-[#8B8878] font-medium animate-pulse">Verificando credenciales de acceso...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center p-4 sm:p-6 font-sans">
+        <div className="w-full max-w-md bg-[#1A1A1A] text-white rounded-[2.5rem] p-8 md:p-10 shadow-2xl border border-zinc-800 animate-in zoom-in-95 duration-200">
+          
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-zinc-800 border border-zinc-700 shadow-md mb-4">
+              <span className="material-symbols-outlined text-3xl text-white">admin_panel_settings</span>
+            </div>
+            <h1 className="font-display text-2xl md:text-3xl font-bold tracking-tight text-white mb-1">
+              PELU<span className="text-[#8B8878] font-light">TURNOS</span>
+            </h1>
+            <p className="text-xs text-zinc-400 font-medium">
+              Panel de Control y Administración
+            </p>
+          </div>
+
+          {/* Mode Switcher Tabs */}
+          <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 mb-6">
+            <button
+              type="button"
+              onClick={() => setAuthMode('login')}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                authMode === 'login'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              Iniciar Sesión
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode('register')}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                authMode === 'register'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              Registrar Admin
+            </button>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
+                Correo Electrónico
+              </label>
+              <div className="relative flex items-center">
+                <span className="material-symbols-outlined absolute left-3.5 text-zinc-500 text-lg">mail</span>
+                <input
+                  required
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="admin@peluturnos.com"
+                  disabled={authLoading}
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-zinc-700 bg-zinc-900 text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-white transition-colors"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
+                Contraseña
+              </label>
+              <div className="relative flex items-center">
+                <span className="material-symbols-outlined absolute left-3.5 text-zinc-500 text-lg">lock</span>
+                <input
+                  required
+                  type={showPassword ? 'text' : 'password'}
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={authLoading}
+                  className="w-full pl-11 pr-11 py-3 rounded-xl border border-zinc-700 bg-zinc-900 text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-white transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 text-zinc-500 hover:text-white transition-colors cursor-pointer"
+                  title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                >
+                  <span className="material-symbols-outlined text-lg">
+                    {showPassword ? 'visibility_off' : 'visibility'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="mt-2 w-full py-3.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-bold text-sm transition-all shadow-md active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {authLoading ? (
+                <>
+                  <span className="inline-block w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
+                  <span>{authMode === 'login' ? 'Iniciando sesión...' : 'Registrando...'}</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-lg">
+                    {authMode === 'login' ? 'login' : 'person_add'}
+                  </span>
+                  <span>{authMode === 'login' ? 'Acceder al Panel' : 'Crear Cuenta'}</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Footer Back Link */}
+          <div className="mt-8 pt-6 border-t border-zinc-800/80 text-center flex flex-col gap-3">
+            <a
+              href="/"
+              className="text-xs text-zinc-400 hover:text-white transition-colors flex items-center justify-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-sm">arrow_back</span>
+              <span>Volver a la Web Principal</span>
+            </a>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FAF9F6] font-sans text-[#2A2A2A]">
       {/* Admin Nav */}
@@ -512,25 +772,42 @@ export default function AdminDashboard() {
             </a>
           </div>
 
-          {/* Hamburger / Barber Pole Menu Button */}
-          {!isNavOpen ? (
-            <button 
-              onClick={() => setIsNavOpen(true)} 
-              className="flex items-center gap-2.5 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 shadow-md hover:scale-105 cursor-pointer border border-zinc-700"
-              aria-label="Abrir menú de navegación"
+          {/* Right Controls: User info badge & Logout + Menu Button */}
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 bg-zinc-800/90 border border-zinc-700 px-3 py-1.5 rounded-full text-xs text-zinc-300">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              <span className="font-mono text-[11px] truncate max-w-[160px]">{currentUser.email}</span>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="hidden sm:flex items-center gap-1 bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 hover:text-white px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-sm"
+              title="Cerrar sesión de administrador"
             >
-              <span className="flex flex-col gap-1 w-4">
-                <span className="w-full h-0.5 bg-white rounded-full"></span>
-                <span className="w-full h-0.5 bg-white rounded-full"></span>
-                <span className="w-full h-0.5 bg-white rounded-full"></span>
-              </span>
-              <span className="font-semibold text-xs capitalize">
-                {activeTab === 'appointments' ? 'Turnos' : activeTab === 'services' ? 'Servicios' : activeTab === 'gallery' ? 'Galería' : 'Horarios'}
-              </span>
+              <span className="material-symbols-outlined text-sm">logout</span>
+              <span>Salir</span>
             </button>
-          ) : (
-            <div className="w-10 h-10"></div>
-          )}
+
+            {/* Hamburger / Barber Pole Menu Button */}
+            {!isNavOpen ? (
+              <button 
+                onClick={() => setIsNavOpen(true)} 
+                className="flex items-center gap-2.5 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 shadow-md hover:scale-105 cursor-pointer border border-zinc-700"
+                aria-label="Abrir menú de navegación"
+              >
+                <span className="flex flex-col gap-1 w-4">
+                  <span className="w-full h-0.5 bg-white rounded-full"></span>
+                  <span className="w-full h-0.5 bg-white rounded-full"></span>
+                  <span className="w-full h-0.5 bg-white rounded-full"></span>
+                </span>
+                <span className="font-semibold text-xs capitalize">
+                  {activeTab === 'appointments' ? 'Turnos' : activeTab === 'services' ? 'Servicios' : activeTab === 'gallery' ? 'Galería' : 'Horarios'}
+                </span>
+              </button>
+            ) : (
+              <div className="w-10 h-10"></div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -667,11 +944,24 @@ export default function AdminDashboard() {
               </button>
             </nav>
 
-            {/* Footer Link to Landing Page */}
-            <div className="pt-4 border-t border-[#E2DED5]">
+            {/* User info & Logout in Drawer */}
+            <div className="pt-4 border-t border-[#E2DED5] flex flex-col gap-2.5">
+              <div className="flex items-center justify-between px-3 py-2 bg-[#EFECE3] rounded-xl text-xs text-[#5A5A5A]">
+                <span className="font-semibold truncate max-w-[180px]">{currentUser.email}</span>
+                <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Activo</span>
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="w-full py-2.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">logout</span>
+                <span>Cerrar Sesión</span>
+              </button>
+
               <a
                 href="/"
-                className="w-full py-3 rounded-xl bg-[#EFECE3] hover:bg-[#E2DED5] text-[#1A1A1A] font-semibold text-xs transition-colors flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl bg-white hover:bg-[#EFECE3] border border-[#E2DED5] text-[#1A1A1A] font-semibold text-xs transition-colors flex items-center justify-center gap-2"
               >
                 <span className="material-symbols-outlined text-base">storefront</span>
                 <span>Ir a la Web Principal</span>
