@@ -57,7 +57,11 @@ export default function EditImageModal({
         body: formData,
       });
 
-      if (!res.ok) throw new Error('Error al actualizar');
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || `Error ${res.status}: No se pudo actualizar la foto.`);
+      }
 
       toast.update(toastId, {
         render: '¡Foto actualizada con éxito! ✨',
@@ -68,13 +72,13 @@ export default function EditImageModal({
 
       onSaveSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       toast.update(toastId, {
-        render: 'Error al actualizar la foto.',
+        render: error.message || 'Error al actualizar la foto.',
         type: 'error',
         isLoading: false,
-        autoClose: 4000,
+        autoClose: 5000,
       });
     } finally {
       setLoading(false);

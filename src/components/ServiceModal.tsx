@@ -122,7 +122,11 @@ export default function ServiceModal({
         }),
       });
 
-      if (!res.ok) throw new Error('Error al guardar el servicio');
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || `Error ${res.status}: No se pudo guardar el servicio.`);
+      }
 
       toast.update(toastId, {
         render: serviceToEdit ? '¡Servicio actualizado con éxito! ✨' : '¡Servicio creado con éxito! ✨',
@@ -133,13 +137,13 @@ export default function ServiceModal({
 
       onSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       toast.update(toastId, {
-        render: 'Error al procesar la solicitud.',
+        render: error.message || 'Error al procesar la solicitud.',
         type: 'error',
         isLoading: false,
-        autoClose: 4000,
+        autoClose: 5000,
       });
     } finally {
       setLoading(false);

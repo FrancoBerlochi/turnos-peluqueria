@@ -477,7 +477,7 @@ export default function AdminDashboard() {
     formData.append('description', descInput?.value || '');
 
     setUploadingImage(true);
-    const toastId = toast.loading('Subiendo imagen a Cloudinary...');
+    const toastId = toast.loading('Subiendo imagen...');
 
     try {
       const res = await fetch(`${API_URL}/api/gallery`, {
@@ -485,7 +485,11 @@ export default function AdminDashboard() {
         body: formData,
       });
 
-      if (!res.ok) throw new Error('Error al subir');
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || `Error ${res.status}: Falló la subida de imagen.`);
+      }
 
       toast.update(toastId, {
         render: '¡Imagen subida a la galería con éxito! 📸',
@@ -496,13 +500,13 @@ export default function AdminDashboard() {
 
       form.reset();
       await fetchGallery();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       toast.update(toastId, {
-        render: 'Error al subir la imagen. Revisa tu conexión o archivo.',
+        render: error.message || 'Error al subir la imagen.',
         type: 'error',
         isLoading: false,
-        autoClose: 4000,
+        autoClose: 5000,
       });
     } finally {
       setUploadingImage(false);
