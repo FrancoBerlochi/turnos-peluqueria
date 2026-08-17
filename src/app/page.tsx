@@ -76,21 +76,26 @@ export default function Home() {
       {isNavOpen && (
         <button
           onClick={() => setIsNavOpen(false)}
-          className="fixed top-3 right-6 sm:right-12 z-50 flex items-center justify-center p-1 rounded-full bg-zinc-900 border-2 border-[#C0BEB8] shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer animate-in zoom-in-75 duration-200"
+          className="fixed top-3 right-6 sm:right-12 z-50 flex items-center justify-center p-1 rounded-full bg-[#1A1A1A] border-2 border-[#D4D4D8] shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer animate-in zoom-in-75 duration-200"
           title="Cerrar menú"
           aria-label="Cerrar menú"
         >
           {/* The Authentic Barber Pole Capsule */}
-          <div className="w-8 h-14 sm:w-9 sm:h-16 rounded-full border-[3px] border-[#A8A59E] p-0.5 bg-[#121212] flex items-center justify-center overflow-hidden relative shadow-inner">
+          <div className="w-8 h-14 sm:w-9 sm:h-16 rounded-full border-[3px] border-[#A1A1AA] p-0.5 bg-[#09090B] flex items-center justify-center overflow-hidden relative shadow-inner">
+            {/* Top and Bottom Chrome Caps */}
+            <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-b from-zinc-300 to-zinc-600 rounded-t-full z-10 opacity-90 pointer-events-none"></div>
+            <div className="absolute bottom-0 inset-x-0 h-1.5 bg-gradient-to-t from-zinc-300 to-zinc-600 rounded-b-full z-10 opacity-90 pointer-events-none"></div>
+
             {/* Rotating Inner Cylinder */}
             <div className="w-full h-full rounded-full barber-pole relative overflow-hidden">
               {/* 3D Glass Cylinder highlight reflection */}
-              <div className="absolute inset-0 bg-gradient-to-r from-white/40 via-transparent to-black/35 pointer-events-none rounded-full"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-transparent to-black/45 pointer-events-none rounded-full"></div>
+              <div className="absolute inset-y-0 left-1 w-1 bg-white/40 blur-[0.5px] pointer-events-none rounded-full"></div>
             </div>
           </div>
 
           {/* Close badge */}
-          <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-bold shadow-md">
+          <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-bold shadow-md border border-white">
             <span className="material-symbols-outlined text-xs">close</span>
           </div>
         </button>
